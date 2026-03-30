@@ -1,0 +1,13 @@
+{
+  "name": "urutau-gjs-tests",
+  "version": "0.1.0",
+  "description": "Tests for Urutau GNOME Shell Extension",
+  "private": true,
+  "scripts": {
+    "test": "gjs --module tests/test-extension.js",
+    "test:watch": "gjs --module tests/test-extension.js --watch"
+  },
+  "devDependencies": {
+    "gjs": "^1.72.0"
+  }
+}

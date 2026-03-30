@@ -1,0 +1,17 @@
+{
+  "name": "Urutau",
+  "description": "Clipboard manager for GNOME - monitors clipboard history",
+  "uuid": "urutau@urutau.io",
+  "shell-version": [
+    "42",
+    "43",
+    "44",
+    "45",
+    "46"
+  ],
+  "url": "https://github.com/urutau/urutau",
+  "version": 1,
+  "version-name": "0.1.0",
+  "session-mode": "user",
+  "init-extension": true
+}

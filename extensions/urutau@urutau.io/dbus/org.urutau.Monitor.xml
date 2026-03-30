@@ -1,0 +1,18 @@
+<node>
+  <interface name="org.urutau.Monitor">
+    <signal name="ClipboardChanged">
+      <arg type="s" name="data" />
+      <arg type="s" name="mime_type" />
+      <arg type="t" name="size" />
+    </signal>
+    <method name="SetClipboard">
+      <arg type="s" name="data" direction="in" />
+      <arg type="s" name="mime_type" direction="in" />
+    </method>
+    <method name="SimulatePaste" />
+    <method name="GetClipboardContent">
+      <arg type="s" name="data" direction="out" />
+      <arg type="s" name="mime_type" direction="out" />
+    </method>
+  </interface>
+</node>
