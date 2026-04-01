@@ -25,7 +25,7 @@
   - Set up exponential backoff reconnection logic for IPC failures
   - _Requirements: 5.1, 5.2_
 
-- [ ] 2.2 Implement SQLite storage layer with concurrency controls
+- [x] 2.2 Implement SQLite storage layer with concurrency controls
   - Create SQLite database schema with history table (id, content, mime_type, created_at, search_text)
   - Configure WAL mode for concurrent read/write access
   - Implement connection pooling with single-writer pattern

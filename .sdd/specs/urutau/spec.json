@@ -1,7 +1,7 @@
 {
   "feature_name": "urutau",
   "created_at": "2026-03-28T12:00:00Z",
-  "updated_at": "2026-03-29T00:00:00Z",
+  "updated_at": "2026-03-31T00:00:00Z",
   "language": "en",
   "phase": "implementation-in-progress",
   "approvals": {
@@ -19,5 +19,5 @@
     }
   },
   "ready_for_implementation": true,
-  "completed_tasks": ["1.1", "1.2", "2.1"]
+  "completed_tasks": ["1.1", "1.2", "2.1", "2.2"]
 }
