@@ -65,6 +65,25 @@ pub fn build(b: *std.Build) void {
     const test_storage_step = b.step("test-storage", "Run storage layer tests");
     test_storage_step.dependOn(&run_storage_test.step);
 
+    // Unit tests for Lua VM
+    const lua_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("lua/vm_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    lua_test.addIncludePath(.{ .cwd_relative = "/usr/local/include" });
+    lua_test.addLibraryPath(.{ .cwd_relative = "/usr/local/lib" });
+    lua_test.linkSystemLibrary("lua");
+    lua_test.linkLibC();
+    lua_test.linkSystemLibrary("m");
+    lua_test.linkSystemLibrary("dl");
+
+    const run_lua_test = b.addRunArtifact(lua_test);
+    const test_lua_step = b.step("test-lua", "Run Lua VM tests");
+    test_lua_step.dependOn(&run_lua_test.step);
+
     // All tests
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
