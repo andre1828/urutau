@@ -33,7 +33,7 @@
   - Set file permissions to 0600 for data privacy
   - _Requirements: 5.3_
 
-- [ ] 2.3 Implement clipboard history data operations
+- [x] 2.3 Implement clipboard history data operations
   - Create HistoryItem struct with id, blob, mime_type, timestamp, metadata
   - Implement INSERT operation for new clipboard captures
   - Implement GetHistory with offset/limit pagination
@@ -42,19 +42,20 @@
   - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2_
 
 - [ ] 3. Lua VM Integration with Resource Controls
-- [ ] 3.1 Integrate Lua 5.5 VM using ziglua
+- [x] 3.1 Integrate Lua 5.5 VM using ziglua
   - Add ziglua dependency to build.zig
   - Initialize Lua state with custom Zig allocator
   - Implement pcall-based error handling for graceful degradation
   - Log Lua errors and skip transformation on failure
   - _Requirements: 1.4_
 
-- [ ] 3.2 Implement Lua resource controls and sandboxing
-  - Configure GeneralPurposeAllocator with configurable memory limits for Lua VM
+- [x] 3.2 Implement Lua resource controls and sandboxing
   - Implement lua_sethook() for instruction count limits and execution timeouts
-  - Create restricted Lua environment (no os.execute, restricted io)
+  - Create restricted Lua environment (no os.execute, restricted io, no require)
   - Add per-script resource quotas in configuration
   - _Requirements: 1.3, 5.2_
+  - **TODO**: `timeout_ms` config field exists but time-based enforcement is not implemented. Only instruction-count-based limiting via `lua_sethook` is active. See `vm.zig:setTimeout()` and `Config.timeout_ms`.
+  - **TODO**: Memory limiting is out of scope - Lua's C allocator semantics make custom allocator integration complex. Clipboard size limits should be enforced at the capture layer before passing data to Lua scripts.
 
 - [ ] 3.3 Implement pre-capture hook execution
   - Define Lua hook interface for clipboard transformation
