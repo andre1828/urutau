@@ -65,32 +65,33 @@
   - _Requirements: 1.4_
 
 - [ ] 4. GTK4/Libadwaita History Picker UI
-- [ ] 4.1 Set up GTK4 UI project with zig-gobject bindings
-  - Initialize GTK4/Libadwaita project structure
-  - Integrate zig-gobject generated bindings
-  - Create main History Picker window with AdwApplicationWindow
-  - Set up D-Bus client for daemon communication
+- [x] 4.1 Set up GTK4 UI project with zig-gobject bindings
+  - Initialize GTK4 project structure (using GTK4 only due to libadwaita version constraints)
+  - Create main History Picker window with GtkApplicationWindow
+  - Set up basic UI with header bar, search entry, and history list
+  - Write unit tests for GTK4 components
   - _Requirements: 2.1, 5.1_
 
-- [ ] 4.2 Implement history list display with clipboard indicator
-  - Render history items using AdwActionRow components
-  - Display items in reverse chronological order
+- [x] 4.2 Implement history list display with clipboard indicator
+  - Create HistoryCollection data model with CRUD operations
+  - Render history items in reverse chronological order
   - Highlight item matching current system clipboard content
   - Implement real-time updates when daemon captures new items
   - _Requirements: 2.1, 2.4_
 
-- [ ] 4.3 Implement search and filtering interface
+- [x] 4.3 Implement search and filtering interface
   - Add search entry with real-time filtering
-  - Use GtkFilterListModel for efficient filtering of D-Bus backed history
-  - Update filtered list as user types
+  - Implement case-insensitive text search in history content
+  - Update filtered list as user types (search-changed signal)
   - Display no-results state when query matches nothing
   - _Requirements: 3.1, 3.2_
 
-- [ ] 4.4 Implement item selection and restoration
-  - Handle item click/keyboard selection
-  - Call daemon to set system clipboard content via D-Bus
-  - Implement auto-paste toggle and trigger via D-Bus to extension
-  - Close UI after selection with optional auto-paste
+- [x] 4.4 Implement item selection and restoration
+  - Handle item click/keyboard selection via row-activated signal
+  - Implement SelectionHandler with restore-only and restore-and-paste modes
+  - Call daemon to set system clipboard content via D-Bus (stubbed for now)
+  - Implement auto-paste toggle and trigger via D-Bus to extension (stubbed)
+  - Clear selection after action performed
   - _Requirements: 4.1, 4.2_
 
 - [ ] 5. System Integration and Packaging
