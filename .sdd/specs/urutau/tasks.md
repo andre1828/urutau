@@ -64,7 +64,7 @@
   - Handle script timeout and memory limit violations
   - _Requirements: 1.4_
 
-- [ ] 4. GTK4/Libadwaita History Picker UI
+- [x] 4. GTK4/Libadwaita History Picker UI
 - [x] 4.1 Set up GTK4 UI project with zig-gobject bindings
   - Initialize GTK4 project structure (using GTK4 only due to libadwaita version constraints)
   - Create main History Picker window with GtkApplicationWindow
