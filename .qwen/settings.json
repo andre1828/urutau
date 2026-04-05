@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npm test)",
-      "Bash(zig *)"
+      "Bash(zig *)",
+      "Bash(git add *)"
     ]
   },
   "$version": 3
