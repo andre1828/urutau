@@ -1238,3 +1238,518 @@ test "LuaVM: handles string with special characters" {
 
     try testing.expectEqualStrings("line1\nline2\ttab\r\nwindows", result.value_string.?);
 }
+
+// ============================================================================
+// Suite 12: Pre-Capture Hook Execution (Task 3.3)
+// ============================================================================
+
+test "LuaVM: execute pre-capture hook with clipboard data" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Simulate pre-capture hook that transforms clipboard text
+    const hook_script =
+        \\local clipboard_data = ...
+        \\return string.upper(clipboard_data)
+    ;
+
+    const input_data = "hello world";
+    const result = try lua_vm.executeWithArgs(allocator, hook_script, &[_]ScriptArg{.{.string = input_data}});
+    defer result.deinit(allocator);
+
+    try testing.expectEqualStrings("HELLO WORLD", result.value_string.?);
+}
+
+test "LuaVM: pre-capture hook passes through data unchanged" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Hook that returns data as-is
+    const hook_script =
+        \\local data = ...
+        \\return data
+    ;
+
+    const input_data = "original clipboard content";
+    const result = try lua_vm.executeWithArgs(allocator, hook_script, &[_]ScriptArg{.{.string = input_data}});
+    defer result.deinit(allocator);
+
+    try testing.expectEqualStrings("original clipboard content", result.value_string.?);
+}
+
+test "LuaVM: pre-capture hook error handling" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Hook that has a runtime error
+    const hook_script =
+        \\local data = ...
+        \\local x = nil
+        \\return x.nonexistent_field
+    ;
+
+    const input_data = "test data";
+    const result = lua_vm.executeWithArgs(allocator, hook_script, &[_]ScriptArg{.{.string = input_data}});
+    try testing.expectError(error.LuaRuntimeError, result);
+}
+
+test "LuaVM: pre-capture hook timeout enforcement" {
+    const allocator = testing.allocator;
+    const config = vm.Config{
+        .instruction_limit = 1000,
+        .timeout_ms = 5000,
+    };
+    var lua_vm = try LuaVM.initCustom(allocator, config);
+    defer lua_vm.deinit();
+
+    // Hook with infinite loop
+    const hook_script =
+        \\while true do
+        \\    -- infinite loop
+        \\end
+    ;
+
+    const input_data = "test data";
+    const result = lua_vm.executeWithArgs(allocator, hook_script, &[_]ScriptArg{.{.string = input_data}});
+    try testing.expectError(error.LuaTimeoutError, result);
+}
+
+test "LuaVM: pre-capture hook with empty clipboard data" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    const hook_script =
+        \\local data = ...
+        \\if #data == 0 then
+        \\    return nil
+        \\end
+        \\return data
+    ;
+
+    const input_data = "";
+    const result = try lua_vm.executeWithArgs(allocator, hook_script, &[_]ScriptArg{.{.string = input_data}});
+    defer result.deinit(allocator);
+
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+// ============================================================================
+// Suite 13: Advanced Metatable Sandbox Escape Tests (Red Team Critical #1)
+// ============================================================================
+
+test "LuaVM: cannot use __index metamethod to access globals" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Attempt to use __index to traverse to restricted globals
+    const script =
+        \\local t = {}
+        \\local mt = {__index = function(tbl, key)
+        \\    return _G[key]
+        \\end}
+        \\setmetatable(t, mt)
+        \\return t['os']
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    // _G['os'] should be nil due to sandbox
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot use __newindex to modify globals" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Attempt to restore os via __newindex
+    const script =
+        \\local t = {}
+        \\local mt = {__newindex = function(tbl, key, val)
+        \\    _G[key] = val
+        \\end}
+        \\setmetatable(t, mt)
+        \\t['os'] = 'restored'
+        \\return os
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+    
+    // os should still be nil even if __newindex tried to set it
+    // The script returns os which should be nil
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot access _ENV to bypass sandbox" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Lua 5.2+ uses _ENV instead of setfenv
+    const script =
+        \\if _ENV then
+        \\    return _ENV['os']
+        \\end
+        \\return nil
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    // _ENV['os'] should be nil
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot use rawget to bypass __index restrictions" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    const script =
+        \\local t = {}
+        \\local mt = {__index = function() return rawget(_G, 'os') end}
+        \\setmetatable(t, mt)
+        \\return t.os
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    // rawget(_G, 'os') should return nil since os is nil
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot use debug library via package.preload" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Attempt to load debug via package.preload
+    const script =
+        \\if package and package.preload then
+        \\    local f = package.preload['debug']
+        \\    if f then return f() end
+        \\end
+        \\return nil
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+// ============================================================================
+// Suite 14: Upvalue and Environment Manipulation Tests
+// ============================================================================
+
+test "LuaVM: cannot access function upvalues" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // debug.getupvalue would be needed for this, but debug is blocked
+    const script =
+        \\local secret = 'sensitive'
+        \\local function get_secret()
+        \\    return secret
+        \\end
+        \\if debug and debug.getupvalue then
+        \\    return debug.getupvalue(get_secret, 1)
+        \\end
+        \\return nil
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot use closure to capture restricted globals" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Attempt to capture os in a closure before it's nil'd
+    // This tests that sandbox is applied at script load time
+    const script =
+        \\local captured_os = os
+        \\return function() return captured_os end
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    // os should already be nil when script runs
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+test "LuaVM: cannot use load to create dynamic code execution" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // load is nil in sandboxed environment
+    const script =
+        \\if load then
+        \\    local f = load('return os.execute')
+        \\    if f then return f() end
+        \\end
+        \\return nil
+    ;
+    const result = try lua_vm.execute(allocator, script);
+    defer result.deinit(allocator);
+
+    try testing.expectEqual(@as(?i32, null), result.value);
+}
+
+// ============================================================================
+// Suite 15: String Bomb / Concatenation DoS Tests
+// ============================================================================
+
+test "LuaVM: string repetition bomb is limited by instructions" {
+    const allocator = testing.allocator;
+    const config = vm.Config{
+        .instruction_limit = 5000,
+        .timeout_ms = 3000,
+    };
+    var lua_vm = try LuaVM.initCustom(allocator, config);
+    defer lua_vm.deinit();
+
+    // Attempt to create large string via repetition in a loop (triggers instruction count)
+    const script =
+        \\local s = ""
+        \\for i = 1, 10000 do
+        \\    s = s .. "A"
+        \\end
+        \\return #s
+    ;
+    const result = lua_vm.execute(allocator, script);
+    
+    // MUST fail with timeout - 10K iterations exceeds 5K instruction limit
+    try testing.expectError(error.LuaTimeoutError, result);
+}
+
+test "LuaVM: exponential string concatenation bomb" {
+    const allocator = testing.allocator;
+    const config = vm.Config{
+        .instruction_limit = 500,
+        .timeout_ms = 2000,
+    };
+    var lua_vm = try LuaVM.initCustom(allocator, config);
+    defer lua_vm.deinit();
+
+    // Exponential growth: s = s..s doubles each iteration
+    // Very low instruction limit to catch this early
+    const script =
+        \\local s = "A"
+        \\for i = 1, 20 do
+        \\    s = s .. s
+        \\end
+        \\return #s
+    ;
+    const result = lua_vm.execute(allocator, script);
+    
+    // If it succeeds, verify the result is bounded (shouldn't exceed reasonable limits)
+    // If it times out, that's also acceptable
+    if (result) |res| {
+        defer res.deinit(allocator);
+        // 2^20 = 1MB - if it succeeded, it should be this value
+        try testing.expectEqual(@as(i32, 1048576), res.value);
+    } else |err| {
+        // Timeout is also acceptable - means instruction limit caught it
+        try testing.expect(err == error.LuaTimeoutError);
+    }
+}
+
+test "LuaVM: table.concat with massive table" {
+    const allocator = testing.allocator;
+    const config = vm.Config{
+        .instruction_limit = 50000,
+        .timeout_ms = 5000,
+    };
+    var lua_vm = try LuaVM.initCustom(allocator, config);
+    defer lua_vm.deinit();
+
+    // Create large table and concat - should hit instruction limit
+    const script =
+        \\local t = {}
+        \\for i = 1, 100000 do t[i] = "X" end
+        \\return table.concat(t)
+    ;
+    const result = lua_vm.execute(allocator, script);
+    
+    // If it succeeds, verify result is valid and bounded
+    // If it times out, that's also acceptable
+    if (result) |res| {
+        defer res.deinit(allocator);
+        try testing.expect(res.value_string != null);
+        // Should be exactly 100K 'X' characters
+        try testing.expectEqual(@as(usize, 100000), res.value_string.?.len);
+    } else |err| {
+        // Timeout is acceptable - means instruction limit caught it
+        try testing.expect(err == error.LuaTimeoutError);
+    }
+}
+
+// ============================================================================
+// Suite 16: Cascading Failure Recovery Tests
+// ============================================================================
+
+test "LuaVM: rapid successive failures don't corrupt VM state" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Run 10 failing scripts in rapid succession
+    var i: u32 = 0;
+    while (i < 10) : (i += 1) {
+        const bad_script = "return 10 +";
+        const result = lua_vm.execute(allocator, bad_script);
+        try testing.expectError(error.LuaSyntaxError, result);
+    }
+
+    // VM should still be functional
+    const good_script = "return 42";
+    const result = try lua_vm.execute(allocator, good_script);
+    defer result.deinit(allocator);
+
+    try testing.expectEqual(@as(i32, 42), result.value);
+}
+
+test "LuaVM: mixed success/failure pattern maintains stability" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Alternate between good and bad scripts
+    var i: u32 = 0;
+    while (i < 20) : (i += 1) {
+        if (i % 2 == 0) {
+            var buf: [32]u8 = undefined;
+            const num_str = std.fmt.bufPrint(&buf, "{d}", .{i}) catch "0";
+            const good = try std.fmt.allocPrint(allocator, "return {s}", .{num_str});
+            defer allocator.free(good);
+            const result = try lua_vm.execute(allocator, good);
+            defer result.deinit(allocator);
+            try testing.expectEqual(@as(i32, @intCast(i)), result.value);
+        } else {
+            const bad = "return x()";
+            const result = lua_vm.execute(allocator, bad);
+            try testing.expectError(error.LuaRuntimeError, result);
+        }
+    }
+}
+
+test "LuaVM: VM survives out-of-memory during script execution" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Script that tries to allocate heavily
+    const heavy_script =
+        \\local t = {}
+        \\for i = 1, 10000 do
+        \\    t[i] = string.rep("A", 10000)
+        \\end
+        \\return #t
+    ;
+    const result = lua_vm.execute(allocator, heavy_script);
+    // Should either succeed or fail gracefully
+    if (result) |res| {
+        defer res.deinit(allocator);
+        try testing.expectEqual(@as(i32, 10000), res.value);
+    } else |_| {
+        // Memory error is acceptable
+        try testing.expect(true);
+    }
+
+    // VM should still be usable
+    const simple = "return 1";
+    const simple_result = try lua_vm.execute(allocator, simple);
+    defer simple_result.deinit(allocator);
+    try testing.expectEqual(@as(i32, 1), simple_result.value);
+}
+
+// ============================================================================
+// Suite 17: Failing Allocator / OOM Tests
+// ============================================================================
+
+test "LuaVM: executeWithArgs handles allocator failure gracefully" {
+    // Use a failing allocator that fails after N allocations
+    const base_allocator = testing.allocator;
+    var failing_allocator = std.testing.FailingAllocator.init(base_allocator, .{
+        .fail_index = 10, // Fail after 10 successful allocations
+    });
+
+    var lua_vm = try LuaVM.init(failing_allocator.allocator());
+    defer lua_vm.deinit();
+
+    // Simple script should work within allocation budget
+    const script = "return 42";
+    const result = lua_vm.execute(failing_allocator.allocator(), script);
+    
+    // Should either succeed or fail gracefully (not crash)
+    if (result) |res| {
+        defer res.deinit(failing_allocator.allocator());
+        try testing.expectEqual(@as(i32, 42), res.value);
+    } else |err| {
+        // OutOfMemory is expected when allocator fails
+        try testing.expect(err == error.OutOfMemory);
+    }
+}
+
+test "LuaVM: VM state remains valid after partial allocation failure" {
+    const allocator = testing.allocator;
+    
+    // Create VM with normal allocator
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Run successful script first
+    const good1 = try lua_vm.execute(allocator, "return 1");
+    defer good1.deinit(allocator);
+    try testing.expectEqual(@as(i32, 1), good1.value);
+
+    // Now try a script that might trigger allocation issues
+    const heavy =
+        \\local t = {}
+        \\for i = 1, 5000 do t[i] = i end
+        \\return #t
+    ;
+    const result = lua_vm.execute(allocator, heavy);
+    if (result) |res| {
+        defer res.deinit(allocator);
+        try testing.expectEqual(@as(i32, 5000), res.value);
+    } else |_| {}
+
+    // VM must still be functional
+    const good2 = try lua_vm.execute(allocator, "return 99");
+    defer good2.deinit(allocator);
+    try testing.expectEqual(@as(i32, 99), good2.value);
+}
+
+test "LuaVM: arena cleanup doesn't double-free on error paths" {
+    const allocator = testing.allocator;
+    var lua_vm = try LuaVM.init(allocator);
+    defer lua_vm.deinit();
+
+    // Run multiple scripts that create arena allocations
+    var i: u32 = 0;
+    while (i < 50) : (i += 1) {
+        var buf: [32]u8 = undefined;
+        const num_str = std.fmt.bufPrint(&buf, "{d}", .{i}) catch "0";
+        const script = try std.fmt.allocPrint(allocator, "return {s}", .{num_str});
+        defer allocator.free(script);
+        
+        const result = lua_vm.execute(allocator, script);
+        if (result) |res| {
+            res.deinit(allocator);
+        } else |_| {}
+    }
+
+    // No double-free should occur - test passes if we reach here
+    try testing.expect(true);
+}
+

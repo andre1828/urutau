@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm test)",
       "Bash(zig *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(timeout *)"
     ]
   },
   "$version": 3

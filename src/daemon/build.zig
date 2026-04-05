@@ -23,6 +23,12 @@ pub fn build(b: *std.Build) void {
 
     // Will link against libdbus and sqlite3 when implementation is complete
     daemon_exe.linkSystemLibrary("sqlite3");
+    daemon_exe.addIncludePath(.{ .cwd_relative = "/usr/local/include" });
+    daemon_exe.addLibraryPath(.{ .cwd_relative = "/usr/local/lib" });
+    daemon_exe.linkSystemLibrary("lua");
+    daemon_exe.linkLibC();
+    daemon_exe.linkSystemLibrary("m");
+    daemon_exe.linkSystemLibrary("dl");
     // daemon_exe.linkSystemLibrary("dbus-1");
 
     b.installArtifact(daemon_exe);
@@ -83,6 +89,30 @@ pub fn build(b: *std.Build) void {
     const run_lua_test = b.addRunArtifact(lua_test);
     const test_lua_step = b.step("test-lua", "Run Lua VM tests");
     test_lua_step.dependOn(&run_lua_test.step);
+
+    // Unit tests for hooks
+    const hooks_test = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("hooks_test.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    hooks_test.root_module.addImport("lua_vm", b.createModule(.{
+        .root_source_file = b.path("lua/vm.zig"),
+        .target = target,
+        .optimize = optimize,
+    }));
+    hooks_test.addIncludePath(.{ .cwd_relative = "/usr/local/include" });
+    hooks_test.addLibraryPath(.{ .cwd_relative = "/usr/local/lib" });
+    hooks_test.linkSystemLibrary("lua");
+    hooks_test.linkLibC();
+    hooks_test.linkSystemLibrary("m");
+    hooks_test.linkSystemLibrary("dl");
+
+    const run_hooks_test = b.addRunArtifact(hooks_test);
+    const test_hooks_step = b.step("test-hooks", "Run hook execution tests");
+    test_hooks_step.dependOn(&run_hooks_test.step);
 
     // All tests
     const unit_tests = b.addTest(.{

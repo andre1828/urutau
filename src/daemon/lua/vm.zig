@@ -30,11 +30,9 @@ pub const ExecutionResult = struct {
     pub const ValueType = enum { nil, number, string, boolean, table };
 
     pub fn deinit(self: *const ExecutionResult, allocator: Allocator) void {
-        if (self.arena) |arena| {
-            arena.deinit();
-        }
-        if (self.value_string) |str| {
-            allocator.free(str);
+        if (self.arena) |arena_ptr| {
+            arena_ptr.deinit();
+            allocator.destroy(arena_ptr);
         }
     }
 };
@@ -194,9 +192,9 @@ pub const LuaVM = struct {
             return error.LuaSyntaxError;
         }
 
-        // Create arena only after successful script loading
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        errdefer arena.deinit();
+        // Create arena on heap so it survives return
+        var arena_ptr = try allocator.create(std.heap.ArenaAllocator);
+        arena_ptr.* = std.heap.ArenaAllocator.init(allocator);
 
         // Push arguments onto stack
         for (args) |arg| {
@@ -223,6 +221,10 @@ pub const LuaVM = struct {
             const err_str = if (err_msg != null) std.mem.sliceTo(err_msg, 0) else "";
             lua.lua_pop(self.state, 1);
 
+            // Clean up arena before returning error
+            arena_ptr.deinit();
+            allocator.destroy(arena_ptr);
+
             // Check if this is a timeout/limit error
             if (std.mem.indexOf(u8, err_str, "limit exceeded") != null or
                 std.mem.indexOf(u8, err_str, "timeout") != null)
@@ -240,7 +242,7 @@ pub const LuaVM = struct {
 
         // Extract result
         var result = ExecutionResult{
-            .arena = &arena,
+            .arena = arena_ptr,
         };
 
         const result_type = lua.lua_type(self.state, -1);
@@ -270,7 +272,7 @@ pub const LuaVM = struct {
                 var len: usize = 0;
                 const str_ptr = lua.lua_tolstring(self.state, -1, &len);
                 if (str_ptr != null) {
-                    const str_slice = allocator.dupe(u8, str_ptr[0..len]) catch "";
+                    const str_slice = arena_ptr.allocator().dupe(u8, str_ptr[0..len]) catch "";
                     result.value_string = str_slice;
                 }
             },

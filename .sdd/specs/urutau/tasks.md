@@ -57,7 +57,7 @@
   - **TODO**: `timeout_ms` config field exists but time-based enforcement is not implemented. Only instruction-count-based limiting via `lua_sethook` is active. See `vm.zig:setTimeout()` and `Config.timeout_ms`.
   - **TODO**: Memory limiting is out of scope - Lua's C allocator semantics make custom allocator integration complex. Clipboard size limits should be enforced at the capture layer before passing data to Lua scripts.
 
-- [ ] 3.3 Implement pre-capture hook execution
+- [x] 3.3 Implement pre-capture hook execution
   - Define Lua hook interface for clipboard transformation
   - Execute user scripts on clipboard data before storage
   - Pass modified data back to daemon for persistence

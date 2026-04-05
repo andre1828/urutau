@@ -23,4 +23,12 @@ echo "Running storage layer tests..."
 zig build test-storage
 echo ""
 
+echo "Running Lua VM tests..."
+zig build test-lua
+echo ""
+
+echo "Running hook execution tests..."
+zig build test-hooks
+echo ""
+
 echo "=== All tests passed ==="
