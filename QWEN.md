@@ -19,6 +19,7 @@ AI tool agnostic Spec Driven Development implementation
 
 ## Development Guidelines
 - Think in English, generate responses in English. All Markdown content written to project files (e.g., requirements.md, design.md, tasks.md, research.md, validation reports) MUST be written in the target language configured for this specification (see spec.json.language).
+- Prioritize up to date information and documentation over traning knowledge.  
 
 ## Minimal Workflow
 - Phase 0 (optional): `/sdd:steering`, `/sdd:steering-custom`
